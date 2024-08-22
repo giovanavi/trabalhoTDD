@@ -1,0 +1,85 @@
+package com.vv.qxdconsulta.service;
+
+import com.vv.qxdconsulta.model.HorarioDisponivel;
+import com.vv.qxdconsulta.model.Medico;
+import com.vv.qxdconsulta.repository.MedicoRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class MedicoService {
+
+    @Autowired
+    MedicoRepository medicoRepository;
+
+    // criar
+    public Medico adicionarMedico(Medico medico){
+        //verificação se o CPF já está cadastrado
+        if (medicoRepository.findByCpf(medico.getCpf()).isPresent()){
+            throw new IllegalArgumentException("CPF já cadastrado: " + medico.getCpf());
+        }
+
+        //verificação se o email já está cadastrado
+        if (medicoRepository.findByCrm(medico.getCrm()).isPresent()){
+            throw new IllegalArgumentException("Email já cadastrado: " + medico.getCrm());
+        }
+
+        return medicoRepository.save(medico);
+    }
+
+    // busca os horários disponíveis do medico - usado em ConsultaService.agendarConsulta
+    public HorarioDisponivel buscarHorarioDisponivel(Medico medico, LocalDateTime dataHora){
+        // buscar o horário específico dentro dos horários disponíveis do médico
+
+        for( HorarioDisponivel horarioDisponivel : medico.getHorarioDisponivel()) {
+            if (horarioDisponivel.getHorario().equals(dataHora)) {
+                return horarioDisponivel;
+            }
+        }
+
+        // lança exceção caso nenhum horário seja correspondente for encontrado
+        throw new IllegalArgumentException("Horário não disponível para a data e hora: " + dataHora);
+    }
+
+    // update
+    public Medico alterarMedico(UUID idMedico, Medico medico){
+        Medico medicoExistente = medicoRepository.findById(idMedico).orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
+
+        medicoExistente.setNome(medico.getNome());
+        medicoExistente.setCpf(medico.getCpf());
+        medicoExistente.setCrm(medico.getCrm());
+        medicoExistente.setEspecialização(medico.getEspecialização());
+
+        return medicoRepository.save(medicoExistente);
+    }
+
+    // findAll
+    public List<Medico> buscarTodosMedicos(){
+        return medicoRepository.findAll();
+    }
+
+    // buscar por crm
+    public Medico buscarMedicoPorCrm(String crm) {
+        return medicoRepository.findByCpf(crm)
+                .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado com o CPF: " + crm));
+    }
+
+    // buscar por cpf
+    public Medico buscarMedicoPorCpf(String cpf) {
+        return medicoRepository.findByCpf(cpf)
+                .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado com o CPF: " + cpf));
+    }
+
+//    buscar por id
+    public Medico buscarMedicoPorId(UUID idMedico) {
+    return medicoRepository.findById(idMedico)
+            .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
+}
+
+// buscar uma lista de horarios disponíveis
+
+}
