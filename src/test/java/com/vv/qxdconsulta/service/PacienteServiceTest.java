@@ -1,18 +1,20 @@
 package com.vv.qxdconsulta.service;
 
+import com.vv.qxdconsulta.model.Consulta;
 import com.vv.qxdconsulta.model.Paciente;
 import com.vv.qxdconsulta.repository.PacienteRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-
-import java.util.Optional;
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import org.mockito.MockitoAnnotations;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 
 class PacienteServiceTest {
@@ -23,12 +25,10 @@ class PacienteServiceTest {
     @InjectMocks
     private PacienteService pacienteService;
 
-
     @BeforeEach
     void setUp(){
         MockitoAnnotations.openMocks(this);
     }
-
 
     @Test
     void testAdicionarPacienteCpfJaCdastrado() {
@@ -89,8 +89,7 @@ class PacienteServiceTest {
 
         //verificação
         assertNotNull(result);
-        assertEquals(paciente.getCpf(), result.getCpf());
-        assertEquals(paciente.getEmail(), result.getEmail());
+        assertEquals(paciente, result);
 
         //verificando se o metodo só foi chamado uma vez
         verify(pacienteRepository, times(1)).save(paciente);
@@ -114,9 +113,7 @@ class PacienteServiceTest {
 
         //verifica se o paciente o paciente existe e foi atualizado corretamente
         assertNotNull(result);
-        assertEquals(pacienteAtualizado.getEmail(), result.getName());
-        assertEquals(pacienteAtualizado.getEmail(), result.getEmail());
-        assertEquals(pacienteAtualizado.getContato(), result.getContato());
+        assertEquals(pacienteAtualizado, result);
 
         //verifica se o metodo foi chamado apenas uma vez
         verify(pacienteRepository, times(1)).save(pacienteExistente);
@@ -127,7 +124,6 @@ class PacienteServiceTest {
         UUID idPaciente = UUID.randomUUID();
 
         Paciente pacienteAtualizado = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", "12345678914", "+5588777777777");
-
 
         //configura o mock para simular que o paciente não foi encontrado
         when(pacienteRepository.findById(idPaciente)).thenReturn(Optional.empty());
@@ -142,24 +138,161 @@ class PacienteServiceTest {
         String mensagemReal = exception.getMessage();
         assertEquals(mensagemEsperada, mensagemReal);
 
-
         //verifica se o metodo de atualizar não foi chamado
         verify(pacienteRepository, never()).save(any(Paciente.class));
     }
 
     @Test
-    void buscarTodosPacientes() {
+    void buscarTodosPacientesSucesso() {
+        List<Paciente> pacienteList = new ArrayList<>();
+        pacienteList.add(new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999"));
+        pacienteList.add(new Paciente(UUID.randomUUID(), "Adriana Vieira", "adriana@email.com", "98765432107", "+5588666666666"));
+
+        //configura o mock para retornar a pacienteList
+        when(pacienteRepository.findAll()).thenReturn(pacienteList);
+
+        //executa o metodo de buscar todos os pacientes
+        List<Paciente> result = pacienteService.buscarTodosPacientes();
+
+        //verifica se o resulta não é nulo e se contem a lista de pacientes simulados e se os pacientes são iguais aos cadastrados
+        assertNotNull(result);
+        assertEquals(pacienteList.size(), result.size());
+        for (int i = 0; i < pacienteList.size(); i++){
+            assertEquals(pacienteList.get(i), result.get(i));
+        }
+
+        //verifica se o metodo findAll foi chamado uma vez
+        verify(pacienteRepository, times(1)).findAll();
     }
 
     @Test
-    void buscarPacientePorId() {
+    void buscarPacientePorIdSucesso() {
+        UUID pacienteId = UUID.randomUUID();
+        Paciente paciente = new Paciente(pacienteId, "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999");
+
+        // configurando mock para retornar o paciente encontrado
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(paciente));
+
+        //executa o metodo de buscar paciente
+        Paciente result = pacienteService.buscarPacientePorId(pacienteId);
+
+        // verifica se o paciente encontrado está correto
+        assertNotNull(result);
+        assertEquals(paciente, result);
+
+        // verifica que o metodo foi chamado uma vez
+        verify(pacienteRepository, times(1)).findById(pacienteId);
+    }
+
+    @Test
+    void buscarPacientePorIdNaoEncontrado(){
+        UUID pacienteId = UUID.randomUUID();
+
+        // configurando mock para retornar o paciente não encontrado
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.empty());
+
+        //executa a verififcação se a exceção é lançada
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            pacienteService.buscarPacientePorId(pacienteId);
+        });
+
+        //verifica mensagem de exceção
+        String mensagemEsperada = "Paciente não encontrado com o ID: " + pacienteId;
+        String mensagemReal = exception.getMessage();
+        assertEquals(mensagemEsperada, mensagemReal);
+
+        //verifica que o metodo so foi chamado uma vez
+        verify(pacienteRepository, times(1)).findById(pacienteId);
     }
 
     @Test
     void buscarPacientePorCpf() {
+        String pacienteCpf = "12345678914";
+        Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", pacienteCpf, "+5588999999999");
+
+        // configurando mock para retornar o paciente encontrado
+        when(pacienteRepository.findByCpf(pacienteCpf)).thenReturn(Optional.of(paciente));
+
+        //executa o metodo de buscar paciente
+        Paciente result = pacienteService.buscarPacientePorCpf(pacienteCpf);
+
+        // verifica se o paciente encontrado está correto
+        assertNotNull(result);
+        assertEquals(paciente, result);
+
+        // verifica que o metodo foi chamado uma vez
+        verify(pacienteRepository, times(1)).findByCpf(pacienteCpf);
     }
 
     @Test
-    void buscarHistoricoDeConsultas() {
+    void buscarPacientePorCpfNaoEncontrado(){
+        String pacienteCpf = "12345678914";
+
+        // configurando mock para retornar o paciente não encontrado
+        when(pacienteRepository.findByCpf(pacienteCpf)).thenReturn(Optional.empty());
+
+        //executa a verififcação se a exceção é lançada
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            pacienteService.buscarPacientePorCpf(pacienteCpf);
+        });
+
+        //verifica mensagem de exceção
+        String mensagemEsperada = "Paciente não encontrado com o CPF: " + pacienteCpf;
+        String mensagemReal = exception.getMessage();
+        assertEquals(mensagemEsperada, mensagemReal);
+
+        //verifica que o metodo so foi chamado uma vez
+        verify(pacienteRepository, times(1)).findByCpf(pacienteCpf);
+    }
+
+    @Test
+    void testBuscarHistoricoDeConsultasSucesso() {
+        UUID pacienteid = UUID.randomUUID();
+        Paciente paciente = new Paciente(pacienteid, "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999");
+
+        // criando um paciente com um historico de consultas
+        List<Consulta> consultaList = new ArrayList<>();
+        consultaList.add(new Consulta(UUID.randomUUID(), LocalDateTime.now(), "Oftalmologia", paciente, null));
+        consultaList.add(new Consulta(UUID.randomUUID(), LocalDateTime.now().minusDays(1), "Pediatria", paciente, null));
+
+        //adicionando a lista de consulta a um paciente
+        paciente.setConsultas(consultaList);
+
+        // configurando o mock para retornar o paciente
+        when(pacienteRepository.findById(pacienteid)).thenReturn(Optional.of(paciente));
+
+        // executando metodo de buscar historico
+        List<Consulta> result = pacienteService.buscarHistoricoDeConsultas(pacienteid);
+
+        //verificando se o resultado não é nulo e se contem o historico do paciente
+        assertNotNull(result);
+        assertEquals(consultaList.size(), result.size());
+        for (int i = 0; i < consultaList.size(); i++){
+            assertEquals(consultaList.get(i), result.get(i));
+        }
+
+        // verifica se o metodo foi chamado apenas umas vez
+        verify(pacienteRepository, times(1)).findById(pacienteid);
+    }
+
+    @Test
+    void testBuscarHistoricoDeConsultasPacienteNaoEncontrado() {
+        UUID pacienteId = UUID.randomUUID();
+
+        // configurando o mock para simular que o paciente não foi encontrado
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.empty());
+
+        //executa a verififcação se a exceção é lançada
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            pacienteService.buscarHistoricoDeConsultas(pacienteId);
+        });
+
+        //verifica a mensagem
+        String mensagemEsperada = "Paciente não encontrado";
+        String mensagemReal = exception.getMessage();
+        assertEquals(mensagemEsperada, mensagemReal);
+
+        //verifica se o metodo só foi chamado uma vez
+        verify(pacienteRepository, times(1)).findById(pacienteId);
     }
 }
