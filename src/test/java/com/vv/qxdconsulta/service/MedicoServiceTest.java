@@ -106,23 +106,23 @@ class MedicoServiceTest {
 
     @Test
     void testBuscarHorarioDisponivel_Sucesso() {
-        // Cria um horário atual para ser usado no teste
-        LocalDateTime horarioAtual = LocalDateTime.now();
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "123456", "12345678901","Ortopedia");
 
-        // Cria uma instância de HorarioDisponivel com o horário atual e capacidade máxima
-        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(horarioAtual, 10);
+        List<HorarioDisponivel> horarioDisponiveis = new ArrayList<>();
+        horarioDisponiveis.add(new HorarioDisponivel(LocalDateTime.now(), 10));
+        horarioDisponiveis.add(new HorarioDisponivel(LocalDateTime.now().plusDays(1), 10));
+        medico.setHorarioDisponivel(horarioDisponiveis);
 
-        // Cria uma instância de Medico e define os horários disponíveis
-        Medico medico = new Medico();
-        medico.setHorarioDisponivel(List.of(horarioDisponivel));
-        horarioDisponivel.setMedico(medico);  // Associa o horário ao médico
+        when(medicoRepository.findById(medico.getId())).thenReturn(Optional.of(medico));
 
-        // Executa o método buscarHorarioDisponivel
-        HorarioDisponivel resultado = medicoService.buscarHorarioDisponivel(medico, horarioAtual);
+        List<HorarioDisponivel> result = medicoService.buscarHorariosDisponiveis(medico.getId());
 
         // Verifica se o resultado não é nulo e se o horário é o esperado
-        assertNotNull(resultado);
-        assertEquals(horarioAtual, resultado.getHorario());
+        assertNotNull(result);
+        assertEquals(horarioDisponiveis.size(), result.size());
+        assertEquals(horarioDisponiveis, result);
+
+        verify(medicoRepository, times(1)).findById(medico.getId());
     }
 
 
