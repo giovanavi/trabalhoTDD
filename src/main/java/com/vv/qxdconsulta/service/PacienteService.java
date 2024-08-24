@@ -49,7 +49,7 @@ public class PacienteService {
 
     public Paciente buscarPacientePorId(UUID idPaciente){
         return pacienteRepository.findById(idPaciente)
-                .orElseThrow(() -> new IllegalArgumentException("Paciente não encontrado com o CPF: " + idPaciente));
+                .orElseThrow(() -> new IllegalArgumentException("Paciente não encontrado com o ID: " + idPaciente));
     }
 
     //buscar paciente por cpf/email/nome
