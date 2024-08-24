@@ -1,6 +1,8 @@
 package com.vv.qxdconsulta.service;
 
 import com.vv.qxdconsulta.model.Consulta;
+import com.vv.qxdconsulta.model.HorarioDisponivel;
+import com.vv.qxdconsulta.model.Medico;
 import com.vv.qxdconsulta.model.Paciente;
 import com.vv.qxdconsulta.repository.PacienteRepository;
 import org.junit.jupiter.api.Test;
@@ -11,10 +13,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import org.mockito.MockitoAnnotations;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 
 class PacienteServiceTest {
@@ -247,8 +246,8 @@ class PacienteServiceTest {
 
     @Test
     void testBuscarHistoricoDeConsultasSucesso() {
-        UUID pacienteid = UUID.randomUUID();
-        Paciente paciente = new Paciente(pacienteid, "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999");
+        UUID pacienteId = UUID.randomUUID();
+        Paciente paciente = new Paciente(pacienteId, "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999");
 
         // criando um paciente com um historico de consultas
         List<Consulta> consultaList = new ArrayList<>();
@@ -259,10 +258,10 @@ class PacienteServiceTest {
         paciente.setConsultas(consultaList);
 
         // configurando o mock para retornar o paciente
-        when(pacienteRepository.findById(pacienteid)).thenReturn(Optional.of(paciente));
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(paciente));
 
         // executando metodo de buscar historico
-        List<Consulta> result = pacienteService.buscarHistoricoDeConsultas(pacienteid);
+        List<Consulta> result = pacienteService.buscarHistoricoDeConsultas(pacienteId);
 
         //verificando se o resultado não é nulo e se contem o historico do paciente
         assertNotNull(result);
@@ -272,7 +271,7 @@ class PacienteServiceTest {
         }
 
         // verifica se o metodo foi chamado apenas umas vez
-        verify(pacienteRepository, times(1)).findById(pacienteid);
+        verify(pacienteRepository, times(1)).findById(pacienteId);
     }
 
     @Test
@@ -294,5 +293,54 @@ class PacienteServiceTest {
 
         //verifica se o metodo só foi chamado uma vez
         verify(pacienteRepository, times(1)).findById(pacienteId);
+    }
+
+    @Test
+    void testRemoverPacienteSucesso(){
+        UUID pacienteId = UUID.randomUUID();
+        Paciente paciente = new Paciente(pacienteId, "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999");
+
+        Medico medico = new Medico(UUID.randomUUID(), "Antonio Anderson", "CRM1235", "15935785204", "Cardiologia");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now(), 5);
+
+        Consulta consulta1 = new Consulta(UUID.randomUUID(), horarioDisponivel.getHorario(), "Cardiologia", paciente, medico);
+        Consulta consulta2 = new Consulta(UUID.randomUUID(), horarioDisponivel.getHorario().minusDays(1), "Oftalmologia", paciente, medico);
+
+        //adiciona as consultas ao paciente e ao horario disponivel do medico
+        paciente.setConsultas(Arrays.asList(consulta1, consulta2));
+        horarioDisponivel.getConsultasAgendadas().add(consulta1);
+        horarioDisponivel.getConsultasAgendadas().add(consulta2);
+        medico.setHorarioDisponivel(Arrays.asList(horarioDisponivel));
+
+        //configurando o mock para retornar paciente existente
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(paciente));
+
+        //executa o metodo de remover
+        pacienteService.removerPaciente(pacienteId);
+
+        //verifica se as consultas foram removida dos horarios do medico
+        assertFalse(horarioDisponivel.getConsultasAgendadas().contains(consulta1));
+        assertFalse(horarioDisponivel.getConsultasAgendadas().contains(consulta2));
+
+        verify(pacienteRepository, times(1)).delete(paciente);
+    }
+
+    @Test
+    void testRemoverPacienteNaoEncontrado(){
+        UUID pacienteId = UUID.randomUUID();
+
+        // configurando o mock para simular que o paciente não foi encontrado
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.empty());
+
+        // executa o método e verifica se a exceção é lançada
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+            pacienteService.removerPaciente(pacienteId);
+        });
+
+        // verifica a mensagem da exceção
+        assertEquals("Paciente não encontrado", exception.getMessage());
+
+        // verifica que o método delete não foi chamado
+        verify(pacienteRepository, never()).delete(any(Paciente.class));
     }
 }

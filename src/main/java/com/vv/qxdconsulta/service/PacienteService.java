@@ -21,7 +21,6 @@ public class PacienteService {
     @Autowired
     ConsultaService consultaService;
 
-
     //registrar paciente
     public Paciente adicionarPaciente(Paciente paciente){
         //verificação se o CPF já está cadastrado
