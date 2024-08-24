@@ -32,6 +32,13 @@ public class Consulta {
 
     @ManyToOne
     @JoinColumn(name = "horario_id", nullable = false)
-    HorarioDisponivel horarioDisponivel;
+    private HorarioDisponivel horarioDisponivel;
 
+    public Consulta(UUID id, LocalDateTime dataHora, String tipoConsulta, Paciente paciente, Medico medico) {
+        this.id = id;
+        this.dataHora = dataHora;
+        this.tipoConsulta = tipoConsulta;
+        this.paciente = paciente;
+        this.medico = medico;
+    }
 }
