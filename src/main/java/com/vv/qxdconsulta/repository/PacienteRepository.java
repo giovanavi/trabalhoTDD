@@ -12,6 +12,4 @@ public interface PacienteRepository extends JpaRepository<Paciente, UUID> {
 
     Optional<Paciente> findByCpf(String cpf);
     Optional<Paciente> findByEmail(String email);
-    //save, delete, update,
-    //busca historico de consultas
 }

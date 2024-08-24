@@ -12,6 +12,4 @@ public interface MedicoRepository extends JpaRepository<Medico, UUID> {
 
     Optional<Medico> findByCrm(String crm);
     Optional<Medico> findByCpf(String cpf);
-
-
 }

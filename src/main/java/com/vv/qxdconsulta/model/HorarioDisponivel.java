@@ -32,7 +32,13 @@ public class HorarioDisponivel {
     @JoinColumn(name = "medico_id", nullable = false)
     private Medico medico;
 
+    public HorarioDisponivel(LocalDateTime horario, int capacidadeMaxima) {
+        this.horario = horario;
+        this.capacidadeMaxima = capacidadeMaxima;
+    }
+
     public boolean podeAgendar() {
         return consultasAgendadas.size() < capacidadeMaxima;
     }
+
 }

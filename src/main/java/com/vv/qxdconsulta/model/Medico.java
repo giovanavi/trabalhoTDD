@@ -33,7 +33,7 @@ public class Medico {
     @OneToMany(mappedBy = "medico", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<HorarioDisponivel> horarioDisponivel = new ArrayList<>();
 
-    public Medico(UUID id, String nome, String crm, String especialização) {
+    public Medico(UUID id, String nome, String crm, String cpf, String especialização) {
         this.id = id;
         this.nome = nome;
         this.crm = crm;
