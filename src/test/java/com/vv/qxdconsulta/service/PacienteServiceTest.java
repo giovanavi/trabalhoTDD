@@ -1,8 +1,6 @@
 package com.vv.qxdconsulta.service;
 
 import com.vv.qxdconsulta.model.Consulta;
-import com.vv.qxdconsulta.model.HorarioDisponivel;
-import com.vv.qxdconsulta.model.Medico;
 import com.vv.qxdconsulta.model.Paciente;
 import com.vv.qxdconsulta.repository.PacienteRepository;
 import org.junit.jupiter.api.Test;
@@ -23,6 +21,9 @@ class PacienteServiceTest {
 
     @InjectMocks
     private PacienteService pacienteService;
+
+    @Mock
+    private ConsultaService consultaService;
 
     @BeforeEach
     void setUp(){
@@ -300,28 +301,42 @@ class PacienteServiceTest {
         UUID pacienteId = UUID.randomUUID();
         Paciente paciente = new Paciente(pacienteId, "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999");
 
-        Medico medico = new Medico(UUID.randomUUID(), "Antonio Anderson", "CRM1235", "15935785204", "Cardiologia");
-        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now(), 5);
+        Consulta consulta1 = new Consulta(UUID.randomUUID(), LocalDateTime.now(), "Cardiologia", paciente, null);
+        Consulta consulta2 = new Consulta(UUID.randomUUID(), LocalDateTime.now().minusDays(1), "Oftalmologia", paciente, null);
 
-        Consulta consulta1 = new Consulta(UUID.randomUUID(), horarioDisponivel.getHorario(), "Cardiologia", paciente, medico);
-        Consulta consulta2 = new Consulta(UUID.randomUUID(), horarioDisponivel.getHorario().minusDays(1), "Oftalmologia", paciente, medico);
+        List<Consulta> consultaList = new ArrayList<>();
+        consultaList.add(consulta1);
+        consultaList.add(consulta2);
+        paciente.setConsultas(consultaList);
 
-        //adiciona as consultas ao paciente e ao horario disponivel do medico
-        paciente.setConsultas(Arrays.asList(consulta1, consulta2));
-        horarioDisponivel.getConsultasAgendadas().add(consulta1);
-        horarioDisponivel.getConsultasAgendadas().add(consulta2);
-        medico.setHorarioDisponivel(Arrays.asList(horarioDisponivel));
-
-        //configurando o mock para retornar paciente existente
+        //configurar mock para retornar o paciente encontrado
         when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(paciente));
 
-        //executa o metodo de remover
         pacienteService.removerPaciente(pacienteId);
 
-        //verifica se as consultas foram removida dos horarios do medico
-        assertFalse(horarioDisponivel.getConsultasAgendadas().contains(consulta1));
-        assertFalse(horarioDisponivel.getConsultasAgendadas().contains(consulta2));
+        //verifica se o metodo removerConsulta foi chamado para cada consulta do paciente
+        verify(consultaService, times(1)).removerConsulta(consulta1.getId());
+        verify(consultaService, times(1)).removerConsulta(consulta2.getId());
 
+        //verifica se o paciente foi removido
+        verify(pacienteRepository, times(1)).delete(paciente);
+    }
+
+    @Test
+    void testRemoverPacienteSemConsulta(){
+        UUID pacienteId = UUID.randomUUID();
+        Paciente paciente = new Paciente(pacienteId, "José Humberto", "josehumberto@email.com", "12345678914", "+5588999999999");
+
+        //retorna um paciente sem consultas
+        when(pacienteRepository.findById(pacienteId)).thenReturn(Optional.of(paciente));
+
+        //executa o metodo
+        pacienteService.removerPaciente(pacienteId);
+
+        //verfifica que o metodo removerConsulta não foi chamado
+        verify(consultaService, never()).removerConsulta(any(UUID.class));
+
+        //verifica se o paciente foi removido do repositorio
         verify(pacienteRepository, times(1)).delete(paciente);
     }
 
