@@ -1,6 +1,8 @@
 package com.vv.qxdconsulta.service;
 
 import com.vv.qxdconsulta.model.Consulta;
+import com.vv.qxdconsulta.model.HorarioDisponivel;
+import com.vv.qxdconsulta.model.Medico;
 import com.vv.qxdconsulta.model.Paciente;
 import com.vv.qxdconsulta.repository.PacienteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +34,8 @@ public class PacienteService {
 
     //atualizar paciente
     public Paciente atualizarPaciente(UUID idPaciente, Paciente paciente){
-        Paciente pacienteExistente = pacienteRepository.findById(idPaciente).orElseThrow(() -> new IllegalArgumentException("Paciente não encontrado"));
+        Paciente pacienteExistente = pacienteRepository.findById(idPaciente)
+                .orElseThrow(() -> new IllegalArgumentException("Paciente não encontrado"));
 
         pacienteExistente.setName(paciente.getName());
         pacienteExistente.setEmail(paciente.getEmail());
@@ -40,6 +43,25 @@ public class PacienteService {
         pacienteExistente.setContato(paciente.getContato());
 
         return pacienteRepository.save(pacienteExistente);
+    }
+
+    public void removerPaciente(UUID idPaciente){
+        Paciente pacienteExistente = pacienteRepository.findById(idPaciente)
+                .orElseThrow( () -> new IllegalArgumentException("Paciente não encontrado"));
+
+        //para cada consulta do paciente, vou remover a consulta do horário disponível do médico
+        for (Consulta consulta: pacienteExistente.getConsultas()){
+            Medico medico = consulta.getMedico();
+            for (HorarioDisponivel horarioDisponivel: medico.getHorarioDisponivel()) {
+                if (horarioDisponivel.getConsultasAgendadas().contains(consulta)){
+                    horarioDisponivel.getConsultasAgendadas().remove(consulta);
+                    break;
+                }
+            }
+        }
+
+        //agora que as consultas do paciente foram removidas dos hoarios do medico, vou excluir o paciente
+        pacienteRepository.delete(pacienteExistente);
     }
 
     //buscar paciente
