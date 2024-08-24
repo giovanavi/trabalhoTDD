@@ -120,23 +120,23 @@ public class ConsultaService {
         Consulta consulta = consultaRepository.findById(consultaId)
                 .orElseThrow(() -> new IllegalArgumentException("Consulta não encontrada"));
 
-        // Encontra o horário disponível correspondente ao horário da consulta
-        HorarioDisponivel horario = medicoService.buscarHorarioDisponivel(consulta.getMedico(), consulta.getDataHora());
-        // Remove a consulta da lista de consultas agendadas no horário encontrado
-        horario.getConsultasAgendadas().remove(consulta);
+        //remover a consulta da lista de consultas no horario disponivel do medico
+        for (HorarioDisponivel horario: consulta.getMedico().getHorarioDisponivel()){
+            if (horario.getConsultasAgendadas().contains(consulta)){
+                horario.getConsultasAgendadas().remove(consulta);
+                break;
+            }
+        }
 
-        // remove a consulta da lista de consultas do paciente
+        //remove da lista de consultas do paciente
         Paciente paciente = consulta.getPaciente();
         paciente.getConsultas().remove(consulta);
 
-        //salva as mudanças no paciente
-        pacienteService.atualizarPaciente(paciente.getId(), paciente);
-        //salva as mudanças no medico
+        //salva as alterações
         medicoService.alterarMedico(consulta.getMedico().getId(), consulta.getMedico());
+        pacienteService.atualizarPaciente(consulta.getPaciente().getId(), consulta.getPaciente());
 
-        // remove a consulta do banco
         consultaRepository.delete(consulta);
     }
-
 }
 

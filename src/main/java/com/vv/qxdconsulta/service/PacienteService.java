@@ -8,6 +8,7 @@ import com.vv.qxdconsulta.repository.PacienteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,6 +17,10 @@ public class PacienteService {
 
     @Autowired
     PacienteRepository pacienteRepository;
+
+    @Autowired
+    ConsultaService consultaService;
+
 
     //registrar paciente
     public Paciente adicionarPaciente(Paciente paciente){
@@ -46,22 +51,15 @@ public class PacienteService {
     }
 
     public void removerPaciente(UUID idPaciente){
-        Paciente pacienteExistente = pacienteRepository.findById(idPaciente)
+        Paciente paciente = pacienteRepository.findById(idPaciente)
                 .orElseThrow( () -> new IllegalArgumentException("Paciente não encontrado"));
 
         //para cada consulta do paciente, vou remover a consulta do horário disponível do médico
-        for (Consulta consulta: pacienteExistente.getConsultas()){
-            Medico medico = consulta.getMedico();
-            for (HorarioDisponivel horarioDisponivel: medico.getHorarioDisponivel()) {
-                if (horarioDisponivel.getConsultasAgendadas().contains(consulta)){
-                    horarioDisponivel.getConsultasAgendadas().remove(consulta);
-                    break;
-                }
-            }
+        for (Consulta consulta: new ArrayList<>(paciente.getConsultas())){
+            consultaService.removerConsulta(consulta.getId());
         }
 
-        //agora que as consultas do paciente foram removidas dos hoarios do medico, vou excluir o paciente
-        pacienteRepository.delete(pacienteExistente);
+        pacienteRepository.delete(paciente);
     }
 
     //buscar paciente

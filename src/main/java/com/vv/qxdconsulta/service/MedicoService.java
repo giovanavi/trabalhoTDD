@@ -1,12 +1,17 @@
 package com.vv.qxdconsulta.service;
 
+import com.vv.qxdconsulta.model.Consulta;
 import com.vv.qxdconsulta.model.HorarioDisponivel;
 import com.vv.qxdconsulta.model.Medico;
+import com.vv.qxdconsulta.model.Paciente;
+import com.vv.qxdconsulta.repository.ConsultaRepository;
 import com.vv.qxdconsulta.repository.MedicoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +20,13 @@ public class MedicoService {
 
     @Autowired
     MedicoRepository medicoRepository;
+
+    @Autowired
+    ConsultaService consultaService;
+
+    @Autowired
+    PacienteService pacienteService;
+
 
     // criar
     public Medico adicionarMedico(Medico medico){
@@ -31,7 +43,7 @@ public class MedicoService {
         return medicoRepository.save(medico);
     }
 
-    // busca os horários disponíveis do medico - usado em ConsultaService.agendarConsulta
+    // busca os horários disponíveis do medico
     public HorarioDisponivel buscarHorarioDisponivel(Medico medico, LocalDateTime dataHora){
         // buscar o horário específico dentro dos horários disponíveis do médico
 
@@ -80,6 +92,38 @@ public class MedicoService {
             .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
 }
 
-// buscar uma lista de horarios disponíveis
+    public void removerMedico(UUID idMedico){
+        Medico medico = medicoRepository.findById(idMedico)
+                .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
+
+        // para cada horario disponivel do medico, remover todas as consultas agendadas
+        for (HorarioDisponivel horarioDisponivel : medico.getHorarioDisponivel()){
+            List<Consulta> consultasRemover = new ArrayList<>(horarioDisponivel.getConsultasAgendadas());
+
+            for (Consulta consulta: consultasRemover){
+                consultaService.removerConsulta(consulta.getId());
+            }
+        }
+
+        medicoRepository.delete(medico);
+    }
+
+    // buscar uma lista de horarios disponíveis do medico
+    public List<HorarioDisponivel> buscarHorariosDisponiveis(UUID idMedico){
+        Medico medico = medicoRepository.findById(idMedico)
+                .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
+
+        return medico.getHorarioDisponivel();
+    }
+
+    public List<HorarioDisponivel> buscarHorariosDisponiveisPorData(Medico medico, LocalDate data) {
+        List<HorarioDisponivel> horarios = new ArrayList<>();
+        for (HorarioDisponivel horario : medico.getHorarioDisponivel()) {
+            if (horario.getHorario().toLocalDate().equals(data)) {
+                horarios.add(horario);
+            }
+        }
+        return horarios;
+    }
 
 }
