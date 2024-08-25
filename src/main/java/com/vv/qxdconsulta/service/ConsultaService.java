@@ -27,9 +27,7 @@ public class ConsultaService {
 
     // agendarConsula
     public Consulta agendarConsulta(String crmMedico, String cpfPaciente, LocalDateTime dataHora, String tipoConsulta){
-        // busca medico
         Medico medico = medicoService.buscarMedicoPorCrm(crmMedico);
-        // busca paciente
         Paciente paciente = pacienteService.buscarPacientePorCpf(cpfPaciente);
 
         // metodo para ver se tem horario disponível
@@ -43,10 +41,10 @@ public class ConsultaService {
         horarioDisponivelService.salvarHorarioDaConsulta(horario, consulta);
 
         // salvar as mudanças do médico e paciente (consultas no perfis deles) no banco de dados
-        medicoService.adicionarMedico(consulta.getMedico());
+        medicoService.alterarMedico(consulta.getMedico().getId(), consulta.getMedico());
 
         paciente.getConsultas().add(consulta);
-        pacienteService.adicionarPaciente(paciente);
+        pacienteService.atualizarPaciente(paciente.getId(), paciente);
 
         return consulta;
     }

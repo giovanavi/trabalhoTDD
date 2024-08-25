@@ -77,7 +77,7 @@ public class MedicoService {
     // buscar por crm
     public Medico buscarMedicoPorCrm(String crm) {
         return medicoRepository.findByCpf(crm)
-                .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado com o CPF: " + crm));
+                .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado com o CRM: " + crm));
     }
 
     // buscar por cpf
