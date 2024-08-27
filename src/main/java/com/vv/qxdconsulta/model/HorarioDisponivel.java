@@ -37,6 +37,8 @@ public class HorarioDisponivel {
         this.capacidadeMaxima = capacidadeMaxima;
     }
 
+    public HorarioDisponivel(){}
+
     public boolean podeAgendar() {
         return consultasAgendadas.size() < capacidadeMaxima;
     }

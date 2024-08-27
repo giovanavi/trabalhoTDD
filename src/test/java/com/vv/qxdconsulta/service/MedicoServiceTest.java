@@ -10,7 +10,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -27,10 +26,11 @@ class MedicoServiceTest {
 
     @Mock
     private MedicoRepository medicoRepository;
-
+    private UUID idMedico;
+    private Medico medico;
+    private List<HorarioDisponivel> horariosDisponiveis;
     private Medico medicoExistente;
     private Medico medicoNovo;
-    private UUID idMedico;
     private List<Medico> listaMedicos;
     private String cpf;
     private String crm;
@@ -76,6 +76,24 @@ class MedicoServiceTest {
         crm = medicoExistente.getCrm();
 
         idMedico = medicoExistente.getId();
+
+        idMedico = UUID.randomUUID();
+        medico = new Medico();
+        medico.setId(idMedico);
+
+        HorarioDisponivel horario1 = new HorarioDisponivel();
+        horario1.setHorario(LocalDateTime.now());
+        horario1.setCapacidadeMaxima(10);
+
+        HorarioDisponivel horario2 = new HorarioDisponivel();
+        horario2.setHorario(LocalDateTime.now().plusDays(1));
+        horario2.setCapacidadeMaxima(10);
+
+        horariosDisponiveis = new ArrayList<>();
+        horariosDisponiveis.add(horario1);
+        horariosDisponiveis.add(horario2);
+
+        medico.setHorarioDisponivel(horariosDisponiveis);
     }
 
     @Test
@@ -121,11 +139,13 @@ class MedicoServiceTest {
             medicoService.adicionarMedico(medico);
         });
 
-        assertEquals("CPF já cadastrado: 123456", exception.getMessage());
+        // Verifique a mensagem correta da exceção
+        assertEquals("CPF já cadastrado: 12345678901", exception.getMessage());
 
-        // Verifica se o mét odo save não foi chamado
+        // Verifica se o método save não foi chamado
         verify(medicoRepository, never()).save(any(Medico.class));
     }
+
 
     @Test
     void testAdicionarMedico_CrmJaCadastrado() {
@@ -144,7 +164,7 @@ class MedicoServiceTest {
             medicoService.adicionarMedico(medico);
         });
 
-        assertEquals("Email já cadastrado: 123456", exception.getMessage());
+        assertEquals("Crm já cadastrado: 123456", exception.getMessage());
 
         // Verifica se o método save não foi chamado
         verify(medicoRepository, never()).save(any(Medico.class));
@@ -296,6 +316,36 @@ class MedicoServiceTest {
 
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
             medicoService.buscarMedicoPorId(idMedico);
+        });
+
+        assertEquals("Médico não encontrado", exception.getMessage());
+
+        verify(medicoRepository, times(1)).findById(idMedico);
+    }
+
+    @Test
+    void testBuscarHorariosDisponiveis_Sucesso() {
+        // Configuração do mock
+        when(medicoRepository.findById(idMedico)).thenReturn(Optional.of(medico));
+
+        // Executa o método
+        List<HorarioDisponivel> result = medicoService.buscarHorariosDisponiveis(idMedico);
+
+        // Verificações
+        assertNotNull(result);
+        assertEquals(horariosDisponiveis.size(), result.size());
+        assertEquals(horariosDisponiveis, result);
+
+        verify(medicoRepository, times(1)).findById(idMedico);
+    }
+
+    @Test
+    void testBuscarHorariosDisponiveis_MedicoNaoEncontrado() {
+        // Configuração do mock para médico não encontrado
+        when(medicoRepository.findById(idMedico)).thenReturn(Optional.empty());
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            medicoService.buscarHorariosDisponiveis(idMedico);
         });
 
         assertEquals("Médico não encontrado", exception.getMessage());

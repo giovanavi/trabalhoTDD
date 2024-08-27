@@ -24,12 +24,13 @@ public class HorarioDisponivelService {
 
 
     public void salvarHorarioDaConsulta(HorarioDisponivel horario, Consulta consulta) {
-        if (horario.podeAgendar()) {
-            horario.getConsultasAgendadas().add(consulta);
-        } else {
+        if (horario.getConsultasAgendadas().size() >= horario.getCapacidadeMaxima()) {
             throw new IllegalArgumentException("Limite de consultas para este horário já atingido.");
         }
+        horario.getConsultasAgendadas().add(consulta);
+        horarioDisponivelRepository.save(horario);  // Verifique se isso está presente
     }
+
 
     public HorarioDisponivel adicionarHorarioDisponivel(HorarioDisponivel horario, Medico medico) {
         medico.getHorarioDisponivel().add(horario);

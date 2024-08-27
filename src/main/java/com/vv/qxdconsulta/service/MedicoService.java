@@ -92,15 +92,15 @@ public class MedicoService {
             .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
 }
 
-    public void removerMedico(UUID idMedico){
+    public void removerMedico(UUID idMedico) {
         Medico medico = medicoRepository.findById(idMedico)
                 .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
 
-        // para cada horario disponivel do medico, remover todas as consultas agendadas
-        for (HorarioDisponivel horarioDisponivel : medico.getHorarioDisponivel()){
+        // Para cada horário disponível do médico, remover todas as consultas agendadas
+        for (HorarioDisponivel horarioDisponivel : medico.getHorarioDisponivel()) {
             List<Consulta> consultasRemover = new ArrayList<>(horarioDisponivel.getConsultasAgendadas());
 
-            for (Consulta consulta: consultasRemover){
+            for (Consulta consulta : consultasRemover) {
                 consultaService.removerConsulta(consulta.getId());
             }
         }

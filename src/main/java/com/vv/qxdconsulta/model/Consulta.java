@@ -41,4 +41,8 @@ public class Consulta {
         this.paciente = paciente;
         this.medico = medico;
     }
+    public Consulta() {
+        // Construtor padrão para testes
+    }
+
 }
