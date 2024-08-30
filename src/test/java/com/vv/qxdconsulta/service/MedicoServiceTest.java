@@ -164,7 +164,7 @@ class MedicoServiceTest {
             medicoService.adicionarMedico(medico);
         });
 
-        assertEquals("Crm já cadastrado: 123456", exception.getMessage());
+        assertEquals("CRM já cadastrado: 123456", exception.getMessage());
 
         // Verifica se o método save não foi chamado
         verify(medicoRepository, never()).save(any(Medico.class));
@@ -242,7 +242,7 @@ class MedicoServiceTest {
             medicoService.buscarMedicoPorCrm(crm);
         });
 
-        assertEquals("Médico não encontrado com o CPF: " + crm, exception.getMessage());
+        assertEquals("Médico não encontrado com o CRM: " + crm, exception.getMessage());
 
         verify(medicoRepository, times(1)).findByCpf(crm);
     }

@@ -11,9 +11,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -81,8 +83,8 @@ class ConsultaServiceTest {
 
         //verifica se os metodos foram chamados foram chamados corretamente
         verify(horarioDisponivelService, times(1)).salvarHorarioDaConsulta(horarioDisponivel, consulta);
-        verify(medicoService, times(1)).adicionarMedico(medico);
-        verify(pacienteService, times(1)).adicionarPaciente(paciente);
+        verify(medicoService, times(1)).alterarMedico(any(UUID.class), any(Medico.class));
+        verify(pacienteService, times(1)).atualizarPaciente(any(UUID.class), any(Paciente.class));
 
     }
 
@@ -159,26 +161,38 @@ class ConsultaServiceTest {
         verify(pacienteService, never()).atualizarPaciente(any(UUID.class), any(Paciente.class));
     }
 
+    //VERIFICAR NOVAMENTE METODOS REALACIONADDAS A CONSULTA E CAPCACIDADE (CONSULTA, HORARIOS DISPONIVEIS)
     @Test
     void testAgendarConsultaExcedendoCapacidade(){
         String crmMedico = "123456";
         String cpfPaciente = "12345678915";
         LocalDateTime dataHora = LocalDateTime.now().plusDays(1);
+        LocalDateTime outroHorario = LocalDateTime.now();
+        System.out.println("DataHora: " + dataHora.toLocalDate());
+        System.out.println("Outro Horario: " + dataHora.toLocalDate());
         String tipoConsulta = "Geral";
 
         Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", crmMedico, "15975328415", "Ortopedia");
         Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", cpfPaciente, "+5588999999999");
         HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 1);
-        horarioDisponivel.getConsultasAgendadas().add(new Consulta(UUID.randomUUID(), dataHora, "Geral", paciente, medico));
+
+        Consulta consulta = new Consulta(UUID.randomUUID(), dataHora, "Geral", paciente, medico);
+
+        horarioDisponivel.getConsultasAgendadas().add(consulta);
+
+        System.out.println("Verificando pode agendar: " + horarioDisponivel.podeAgendar());
+        horarioDisponivelService.salvarHorarioDaConsulta(horarioDisponivel, consulta);
 
         when(medicoService.buscarMedicoPorCrm(crmMedico)).thenReturn(medico);
+        System.out.println("When Medico: " + medico.getId());
         when(pacienteService.buscarPacientePorCpf(cpfPaciente)).thenReturn(paciente);
+        System.out.println("When Paciente: " + paciente.getId());
         when(medicoService.buscarHorarioDisponivel(medico, dataHora)).thenReturn(horarioDisponivel);
+        System.out.println("When Horario disponivel: " + horarioDisponivel.getHorario().toLocalDate());
 
-        Exception exception = assertThrows(IllegalArgumentException.class, ()->{
+        Exception exception = assertThrows(IllegalArgumentException.class, ()-> {
             consultaService.agendarConsulta(crmMedico, cpfPaciente, dataHora, tipoConsulta);
         });
-
 
         assertEquals("Limite de consultas para este horário já atingido.", exception.getMessage());
 
@@ -308,24 +322,92 @@ class ConsultaServiceTest {
     //buscaConsultasPorData
     @Test
     void testBuscarConsultaPorDataSucesso(){
+        UUID medicoId = UUID.randomUUID();
+        LocalDateTime dataHora = LocalDateTime.now();
+        LocalDate data = dataHora.toLocalDate();
+        Medico medico = new Medico(medicoId, "Dr. Silva", "CRM1234", "12345678915", "Pediatra");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 5);
+        List<Consulta> consultaList = new ArrayList<>();
+        consultaList.add(new Consulta(UUID.randomUUID(), dataHora, "Geral", null, medico, horarioDisponivel));
 
+        horarioDisponivel.getConsultasAgendadas().addAll(consultaList);
+        medico.getHorarioDisponivel().add(horarioDisponivel);
+
+        //mock para retornar o medico
+        when(medicoService.buscarMedicoPorId(medicoId)).thenReturn(medico);
+
+        List<Consulta> result = consultaService.buscaConsultasPorData(medicoId, dataHora);
+
+        assertNotNull(result);
+        assertEquals(consultaList.size(), result.size());
+        assertEquals(consultaList, result);
+
+        verify(medicoService, times(1)).buscarMedicoPorId(medicoId);
     }
 
     @Test
     void testBuscarConsultaPorDataComMedicoNaoEncnotrado(){
+        UUID medicoId = UUID.randomUUID();
+        LocalDateTime dataHora = LocalDateTime.now();
 
+        when(medicoService.buscarMedicoPorId(medicoId)).thenThrow(new IllegalArgumentException("Médico não encontrado"));
+
+        Exception exception = assertThrows(IllegalArgumentException.class, ()->{
+           consultaService.buscaConsultasPorData(medicoId, dataHora);
+        });
+
+        assertEquals("Médico não encontrado", exception.getMessage());
+
+        verify(medicoService, times(1)).buscarMedicoPorId(medicoId);
     }
 
     @Test
     void testBuscarConsultaPorDataSemConsultas(){
+        UUID medicoId = UUID.randomUUID();
+        LocalDateTime dataHora = LocalDateTime.now();
+        Medico medico = new Medico(medicoId, "Dr. Silva", "CRM12345", "12346579885", "Ortopedista");
 
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 5);
+
+        when(medicoService.buscarMedicoPorId(medicoId)).thenReturn(medico);
+
+        List<Consulta> result = consultaService.buscaConsultasPorData(medicoId, dataHora);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(medicoService, times(1)).buscarMedicoPorId(medicoId);
     }
 
     //alterarConsulta
-    @Test
-    void testAlterarConsultaSucesso(){
-
-    }
+    //rever metodos de consulta e entender melhor a relação entre HD e Consulta e Medico
+//    @Test
+//    void testAlterarConsultaSucesso(){
+//        UUID consultId = UUID.randomUUID();
+//        LocalDateTime novaDataHora = LocalDateTime.now().plusDays(1);
+//        String novoTipoConsulta = "Cardiologia";
+//
+//        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12346579815", "Cardiologista");
+//        Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", "12345678948", "+55889999999999");
+//        HorarioDisponivel horarioAntigo = new HorarioDisponivel(LocalDateTime.now(), 5);
+//        HorarioDisponivel novoHorario = new HorarioDisponivel(novaDataHora, 5);
+//
+//        Consulta consultaExistente = new Consulta(consultId, LocalDateTime.now(), "Ortopedia", paciente, medico, horarioAntigo);
+//
+//        when(consultaRepository.findById(consultId)).thenReturn(Optional.of(consultaExistente));
+//        when(medicoService.buscarHorarioDisponivel(medico, novaDataHora)).thenReturn(novoHorario);
+//
+//        Consulta result = consultaService.alterarConsulta(consultId, novaDataHora, novoTipoConsulta);
+//
+//        assertNotNull(result);
+//        assertEquals(novaDataHora, result.getDataHora());
+//        assertEquals(novoTipoConsulta, result.getTipoConsulta());
+//        assertEquals(novoHorario, result.getHorarioDisponivel());
+//
+//        verify(consultaRepository, times(1)).save(result);
+//        verify(medicoService, times(1)).alterarMedico(medico.getId(), medico);
+//        verify(pacienteService, times(1)).atualizarPaciente(paciente.getId(), paciente);
+//    }
 
     @Test
     void testAlterarConsultaNaoEncontrada(){
