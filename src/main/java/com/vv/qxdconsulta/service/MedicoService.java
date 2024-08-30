@@ -37,7 +37,7 @@ public class MedicoService {
 
         //verificação se o email já está cadastrado
         if (medicoRepository.findByCrm(medico.getCrm()).isPresent()){
-            throw new IllegalArgumentException("Email já cadastrado: " + medico.getCrm());
+            throw new IllegalArgumentException("CRM já cadastrado: " + medico.getCrm());
         }
 
         return medicoRepository.save(medico);
@@ -46,9 +46,9 @@ public class MedicoService {
     // busca os horários disponíveis do medico
     public HorarioDisponivel buscarHorarioDisponivel(Medico medico, LocalDateTime dataHora){
         // buscar o horário específico dentro dos horários disponíveis do médico
-
+        System.out.println("Dentro do metodo buscarHorarioDisponivel....");
         for( HorarioDisponivel horarioDisponivel : medico.getHorarioDisponivel()) {
-            if (horarioDisponivel.getHorario().equals(dataHora)) {
+            if (horarioDisponivel.getHorario().toLocalDate().equals(dataHora.toLocalDate())) {
                 return horarioDisponivel;
             }
         }
@@ -65,6 +65,7 @@ public class MedicoService {
         medicoExistente.setCpf(medico.getCpf());
         medicoExistente.setCrm(medico.getCrm());
         medicoExistente.setEspecialização(medico.getEspecialização());
+        medicoExistente.setHorarioDisponivel(medico.getHorarioDisponivel());
 
         return medicoRepository.save(medicoExistente);
     }
@@ -109,6 +110,8 @@ public class MedicoService {
     }
 
     // buscar uma lista de horarios disponíveis do medico
+    // mover isso para HorarioDisponivelService
+    //posso remover daqui, já fiz em horarioDispoivelService (listarHorariosDisponiveisPorMedico)
     public List<HorarioDisponivel> buscarHorariosDisponiveis(UUID idMedico){
         Medico medico = medicoRepository.findById(idMedico)
                 .orElseThrow(() -> new IllegalArgumentException("Médico não encontrado"));
@@ -116,6 +119,8 @@ public class MedicoService {
         return medico.getHorarioDisponivel();
     }
 
+    // mover isso para HorarioDisponivelService
+    //já fiz lá, pode retirar daqui
     public List<HorarioDisponivel> buscarHorariosDisponiveisPorData(Medico medico, LocalDate data) {
         List<HorarioDisponivel> horarios = new ArrayList<>();
         for (HorarioDisponivel horario : medico.getHorarioDisponivel()) {

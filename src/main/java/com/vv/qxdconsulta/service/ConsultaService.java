@@ -25,41 +25,38 @@ public class ConsultaService {
     @Autowired
     ConsultaRepository consultaRepository;
 
-    // agendarConsula
+    // agendarConsula ALTERAR
     public Consulta agendarConsulta(String crmMedico, String cpfPaciente, LocalDateTime dataHora, String tipoConsulta){
+
         Medico medico = medicoService.buscarMedicoPorCrm(crmMedico);
         Paciente paciente = pacienteService.buscarPacientePorCpf(cpfPaciente);
 
         // metodo para ver se tem horario disponível
-        HorarioDisponivel horario = medicoService.buscarHorarioDisponivel(medico, dataHora);
+        HorarioDisponivel horarioDisponivel = horarioDisponivelService.buscarHorarioPorMedico(medico.getCrm(), dataHora);
 
-        // criar a consulta
-        Consulta consulta = new Consulta(UUID.randomUUID(), dataHora, tipoConsulta, paciente, medico, horario);
-        horario.getConsultasAgendadas().add(consulta);
+        // verifico se posso agendar por conta da capacidade
+        horarioDisponivelService.verificarDisponibilidadeDeConsulta(horarioDisponivel);
 
-        // verifico se posso agendar por conta da capacidade e agendo.
-        horarioDisponivelService.salvarHorarioDaConsulta(horario, consulta);
+//         criar a consulta
+        Consulta novaConsulta = new Consulta(UUID.randomUUID(), dataHora, tipoConsulta, paciente, medico, horarioDisponivel);
 
         // salvar as mudanças do médico e paciente (consultas no perfis deles) no banco de dados
-        medicoService.alterarMedico(consulta.getMedico().getId(), consulta.getMedico());
 
-        paciente.getConsultas().add(consulta);
-        pacienteService.atualizarPaciente(paciente.getId(), paciente);
+        horarioDisponivel.getConsultasAgendadas().add(novaConsulta);
+        consultaRepository.save(novaConsulta);
 
-        return consulta;
+        return novaConsulta;
     }
 
     //buscar consulta por CRM de medico
     public List<Consulta> buscarConsultasPorMedico(String crm){
         Medico medico = medicoService.buscarMedicoPorCrm(crm);
-
         return consultaRepository.findByMedico(medico);
     }
 
     //buscar consulta por paciente
     public List<Consulta> buscarConsultasPorPaciente(String cpf){
         Paciente paciente = pacienteService.buscarPacientePorCpf(cpf);
-
         return consultaRepository.findByPaciente(paciente);
     }
 
@@ -74,43 +71,76 @@ public class ConsultaService {
         // percorre os horarios disponíveis do medico
         for (HorarioDisponivel horario : medico.getHorarioDisponivel()){
             // se o horario disponível é o que eu quero
-            if (horario.getHorario().toLocalDate().equals(date)){
+            if (horario.getHorario().toLocalDate().equals(date.toLocalDate())){
                 // adiciono todas as consulta que eu encontrei do dia x na lista
                 consultaList.addAll(horario.getConsultasAgendadas());
             }
-
         }
 
         //retorna lista de consultas
         return consultaList;
     }
 
-    // atualizar consulta
-    public Consulta alterarConsulta(UUID consultaId, LocalDateTime novaDataHora, String tipoDeConsulta){
-
+    //atualizar apenas o horario da consulta
+    public Consulta alterarHorarioDaConsulta(UUID consultaId, LocalDateTime novoHorario){
         Consulta consulta = consultaRepository.findById(consultaId)
                 .orElseThrow(() -> new IllegalArgumentException("Consulta não encontrada"));
 
-        // busca o horario atual da consulta e remove
-        HorarioDisponivel horarioAntigo = medicoService.buscarHorarioDisponivel(consulta.getMedico(), consulta.getDataHora());
+        HorarioDisponivel horarioAntigo = consulta.getHorarioDisponivel();
+        Medico medico = consulta.getMedico();
+
+        // Verificar se o médico tem o novo horário disponível
+        HorarioDisponivel novoHorarioDisponivel = horarioDisponivelService.buscarHorarioPorMedico(medico.getCrm(), novoHorario);
+
+        // Remover a consulta do horário antigo
         horarioAntigo.getConsultasAgendadas().remove(consulta);
+        horarioDisponivelService.salvarMudancaDeHorario(horarioAntigo);
 
-        //verifica se o novo horario está disponivel e salva ele
-        HorarioDisponivel novoHorario = medicoService.buscarHorarioDisponivel(consulta.getMedico(), novaDataHora);
+        // verificando disponibilidade do nova consulta por conta da capacidade
+        horarioDisponivelService.verificarDisponibilidadeDeConsulta(novoHorarioDisponivel);
 
-        // atualiza detalhes da consulta
-        consulta.setDataHora(novaDataHora);
-        consulta.setTipoConsulta(tipoDeConsulta);
-        consulta.setHorarioDisponivel(novoHorario);
+        novoHorarioDisponivel.getConsultasAgendadas().add(consulta);
 
-        //adiciona a consulta ao novo horario
-        novoHorario.getConsultasAgendadas().add(consulta);
-
-        // adiciona a consulta com o novo horario
+        //atualizar a consulta com o novo horário
+        consulta.setHorarioDisponivel(novoHorarioDisponivel);
+        consulta.setDataHora(novoHorario);
         consultaRepository.save(consulta);
 
         return consulta;
     }
+
+    // atualizar consulta
+//    public Consulta alterarDadosDaConsulta(UUID consultaId, String tipoDeConsulta){
+//
+//        Consulta consulta = consultaRepository.findById(consultaId)
+//                .orElseThrow(() -> new IllegalArgumentException("Consulta não encontrada"));
+//
+//        // busca o horario atual da consulta e remove
+//        HorarioDisponivel horarioAntigo = medicoService.buscarHorarioDisponivel(consulta.getMedico(), consulta.getDataHora());
+//        horarioAntigo.getConsultasAgendadas().remove(consulta);
+//
+//        //verifica se o novo horario está disponivel e salva ele
+//        HorarioDisponivel novoHorario = medicoService.buscarHorarioDisponivel(consulta.getMedico(), novaDataHora);
+//
+//        // atualiza detalhes da consulta
+//        consulta.setDataHora(novaDataHora);
+//        consulta.setTipoConsulta(tipoDeConsulta);
+//        consulta.setHorarioDisponivel(novoHorario);
+//
+//        //adiciona a consulta ao novo horario
+//        novoHorario.getConsultasAgendadas().add(consulta);
+//
+//        //atualiza a lista de horarios do medico
+//        consulta.getMedico().getHorarioDisponivel().remove(horarioAntigo);
+//        consulta.getMedico().getHorarioDisponivel().add(novoHorario);
+//
+//        medicoService.alterarMedico(consulta.getMedico().getId(), consulta.getMedico());
+//
+//        // adiciona a consulta com o novo horario
+//        consultaRepository.save(consulta);
+//
+//        return consulta;
+//    }
 
     //remover consulta
     public void removerConsulta(UUID consultaId){
