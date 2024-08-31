@@ -40,12 +40,12 @@ public class HorarioDisponiveisServiceTest {
     private HorarioDisponivel horarioDisponivelClass;
 
     @BeforeEach
-    void setUp() {
+    public void setUp() {
         MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    void testAdicionarHorarioDisponivelSucesso() {
+    public void testAdicionarHorarioDisponivelSucesso() {
         Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12345678954", "Pediatria");
         HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now(), 5);
 
@@ -62,7 +62,7 @@ public class HorarioDisponiveisServiceTest {
     }
 
     @Test
-    void testAdicionarHorarioDisponivelMedicoNaoEncontrado(){
+    public void testAdicionarHorarioDisponivelMedicoNaoEncontrado(){
         HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now(), 5);
         Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12345678954", "Pediatria");
 
@@ -76,6 +76,29 @@ public class HorarioDisponiveisServiceTest {
         // Verificar a mensagem de erro
         assertEquals("Médico não encontrado com o CRM: " + medico.getCrm(), exception.getMessage());
         verify(medicoService, times(1)).buscarMedicoPorCrm(medico.getCrm());
+        verify(horarioDisponivelRepository, never()).save(any(HorarioDisponivel.class));
+    }
+
+    //salvarMudancaDeHorario
+    @Test
+    public void testSalvarMudancaDeHorarioSucesso(){
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now(), 5);
+
+        // Chamar o método salvarMudancaDeHorario
+        horarioDisponivelService.salvarMudancaDeHorario(horarioDisponivel);
+
+        // Verificar se o método save foi chamado com o horário correto
+        verify(horarioDisponivelRepository, times(1)).save(horarioDisponivel);
+    }
+
+    @Test
+    public void testSalvarMudancaDeHorarioNull(){
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            horarioDisponivelService.salvarMudancaDeHorario(null);
+        });
+
+        // Verificar se o método save não foi chamad
         verify(horarioDisponivelRepository, never()).save(any(HorarioDisponivel.class));
     }
 
@@ -140,9 +163,11 @@ public class HorarioDisponiveisServiceTest {
     public void testBuscarHorarioPorMedicoSucesso(){
         Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12345678954", "Pediatria");
         LocalDateTime horario = LocalDateTime.now().plusDays(1);
+
         List<HorarioDisponivel> horarioDisponivelList = new ArrayList<>();
         horarioDisponivelList.add(new HorarioDisponivel(horario, 5));
         horarioDisponivelList.add(new HorarioDisponivel(LocalDateTime.now().plusDays(2), 3));
+
         medico.setHorarioDisponivel(horarioDisponivelList);
 
         when(medicoService.buscarMedicoPorCrm(medico.getCrm())).thenReturn(medico);

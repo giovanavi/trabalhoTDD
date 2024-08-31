@@ -11,7 +11,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,57 +38,40 @@ class ConsultaServiceTest {
     @InjectMocks
     private ConsultaService consultaService;
 
+
     @BeforeEach
     void setUp(){
         MockitoAnnotations.openMocks(this);
+
     }
 
     //agendarConsulta
     @Test
-    void testAgendarConsultaSucesso(){
-        String crmMedico = "123456";
-        String cpfPaciente = "12345678915";
-        LocalDateTime dataHora = LocalDateTime.now().plusDays(1);
-        String tipoConsulta = "Geral";
+    public void testAgendarConsultaSucesso(){
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "15975328415", "Ortopedia");
+        Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", "15975348615", "+5588999999999");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now().plusDays(1), 5);
 
-        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", crmMedico, "15975328415", "Ortopedia");
-        Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", cpfPaciente, "+5588999999999");
-        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 10);
+        Consulta consulta = new Consulta(UUID.randomUUID(), LocalDateTime.now().plusDays(1), "Consulta Geral", paciente, medico);
+        consulta.setHorarioDisponivel(horarioDisponivel);
 
-        //configurando mock
-        when(medicoService.buscarMedicoPorCrm(crmMedico)).thenReturn(medico);
-        when(pacienteService.buscarPacientePorCpf(cpfPaciente)).thenReturn(paciente);
-        when(medicoService.buscarHorarioDisponivel(medico, dataHora)).thenReturn(horarioDisponivel);
+        when(medicoService.buscarMedicoPorCrm(medico.getCrm())).thenReturn(medico);
+        when(pacienteService.buscarPacientePorCpf(paciente.getCpf())).thenReturn(paciente);
+        when(horarioDisponivelService.buscarHorarioPorMedico(medico.getCrm(), horarioDisponivel.getHorario())).thenReturn(horarioDisponivel);
+        when(consultaRepository.save(any(Consulta.class))).thenReturn(consulta);
 
-        //executa o metodo agendar consulta
-        Consulta consulta = consultaService.agendarConsulta(crmMedico, cpfPaciente, dataHora, tipoConsulta);
+        Consulta result = consultaService.agendarConsulta(medico.getCrm(), paciente.getCpf(), horarioDisponivel.getHorario(), consulta.getTipoConsulta());
 
-        //verificações
-        assertNotNull(consulta);
-        assertEquals(dataHora, consulta.getDataHora());
-        assertEquals(tipoConsulta, consulta.getTipoConsulta());
-        assertEquals(paciente, consulta.getPaciente());
-        assertEquals(medico, consulta.getMedico());
+        assertNotNull(result);
+        assertEquals(medico, result.getMedico());
+        assertEquals(paciente, result.getPaciente());
+        assertEquals(horarioDisponivel, result.getHorarioDisponivel());
 
-        //verifica se a consulta foi adicionada ao horario disponivel
-        boolean consultaAgendada = false;
-        for (Consulta c: horarioDisponivel.getConsultasAgendadas()){
-            if (c.equals(consulta)){
-                consultaAgendada = true;
-                break;
-            }
-        }
-        assertTrue(consultaAgendada);
-
-        //verifica se os metodos foram chamados foram chamados corretamente
-        verify(horarioDisponivelService, times(1)).salvarHorarioDaConsulta(horarioDisponivel, consulta);
-        verify(medicoService, times(1)).alterarMedico(any(UUID.class), any(Medico.class));
-        verify(pacienteService, times(1)).atualizarPaciente(any(UUID.class), any(Paciente.class));
-
+        verify(consultaRepository, times(1)).save(any(Consulta.class));
     }
 
     @Test
-    void testAgendarConsultaMedicoNaoEncontrado(){
+    public void testAgendarConsultaMedicoNaoEncontrado(){
         String crmMedico = "123456";
         String cpfPaciente = "12345678915";
         LocalDateTime dataHora = LocalDateTime.now().plusDays(1);
@@ -106,104 +88,115 @@ class ConsultaServiceTest {
         assertEquals("Médico não encontrado com o CRM: " + crmMedico, exception.getMessage());
 
         verify(pacienteService, never()).buscarPacientePorCpf(anyString());
-        verify(horarioDisponivelService, never()).salvarHorarioDaConsulta(any(HorarioDisponivel.class), any(Consulta.class));
-        verify(medicoService, never()).alterarMedico(any(UUID.class), any(Medico.class));
+        verify(horarioDisponivelService, never()).salvarMudancaDeHorario(any(HorarioDisponivel.class));
+        verify(horarioDisponivelService, never()).verificarDisponibilidadeDeConsulta(any(HorarioDisponivel.class));
+        verify(consultaRepository, never()).save(any(Consulta.class));
     }
 
     @Test
-    void testAgendarConsultaPacienteNaoEncontrado(){
-        String crmMedico = "123456";
-        String cpfPaciente = "12345678915";
-        LocalDateTime dataHora = LocalDateTime.now().plusDays(1);
+    public void testAgendarConsultaPacienteNaoEncontrado(){
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. João", "12345", "11122233344", "Cardiologia");
+        Paciente paciente = new Paciente(UUID.randomUUID(), "Maria Silva", "maria@example.com", "11122233344", "11999999999");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now().plusDays(1), 5);
         String tipoConsulta = "Geral";
 
-        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", crmMedico, "15975328415", "Ortopedia");
-
         //configura o mock para lançar a exceção quando o medico não for encontrado pelo metodo buscarMedicoPorCrm
-        when(medicoService.buscarMedicoPorCrm(crmMedico)).thenReturn(medico);
-        when(pacienteService.buscarPacientePorCpf(cpfPaciente)).thenThrow(new IllegalArgumentException("Paciente não encontrado com o CPF: " + cpfPaciente));
+        when(medicoService.buscarMedicoPorCrm(medico.getCrm())).thenReturn(medico);
+        when(pacienteService.buscarPacientePorCpf(paciente.getCpf())).thenThrow(new IllegalArgumentException("Paciente não encontrado com o CPF: " + paciente.getCpf()));
 
         //verifica se a exceção é lançada corretamente
         Exception exception = assertThrows(IllegalArgumentException.class, () ->{
-            consultaService.agendarConsulta(crmMedico, cpfPaciente, dataHora, tipoConsulta);
+            consultaService.agendarConsulta(medico.getCrm(), paciente.getCpf(), horarioDisponivel.getHorario(), tipoConsulta);
         });
 
-        assertEquals("Paciente não encontrado com o CPF: " + cpfPaciente, exception.getMessage());
+        assertEquals("Paciente não encontrado com o CPF: " + paciente.getCpf(), exception.getMessage());
 
-        verify(horarioDisponivelService, never()).salvarHorarioDaConsulta(any(HorarioDisponivel.class), any(Consulta.class));
-        verify(medicoService, never()).alterarMedico(any(UUID.class), any(Medico.class));
-        verify(pacienteService, never()).atualizarPaciente(any(UUID.class), any(Paciente.class));
+        verify(consultaRepository, never()).save(any(Consulta.class));
     }
 
     @Test
-    void testAgendarConsultaHorarioNaoDisponivel(){
-        String crmMedico = "123456";
-        String cpfPaciente = "12345678915";
-        LocalDateTime dataHora = LocalDateTime.now().plusDays(1);
-        String tipoConsulta = "Geral";
+    public void testAgendarConsultaHorarioNaoDisponivel(){
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. João", "12345", "11122233344", "Cardiologia");
+        Paciente paciente = new Paciente(UUID.randomUUID(), "Maria Silva", "maria@example.com", "11122233344", "11999999999");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now().plusDays(1), 5);
 
-        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", crmMedico, "15975328415", "Ortopedia");
-        Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", cpfPaciente, "+5588999999999");
+        Consulta consulta = new Consulta(UUID.randomUUID(), LocalDateTime.now().plusDays(1), "Consulta Geral", paciente, medico);
+        consulta.setHorarioDisponivel(horarioDisponivel);
 
-        //
-        when(medicoService.buscarMedicoPorCrm(crmMedico)).thenReturn(medico);
-        when(pacienteService.buscarPacientePorCpf(cpfPaciente)).thenReturn(paciente);
-        when(medicoService.buscarHorarioDisponivel(medico, dataHora)).thenThrow(new IllegalArgumentException("Horário não disponível"));
+        //mock
+        when(medicoService.buscarMedicoPorCrm(medico.getCrm())).thenReturn(medico);
+        when(pacienteService.buscarPacientePorCpf(paciente.getCpf())).thenReturn(paciente);
+        when(horarioDisponivelService.buscarHorarioPorMedico(medico.getCrm(), horarioDisponivel.getHorario())).thenReturn(horarioDisponivel);
+        doThrow(new IllegalArgumentException("Limite de consultas para este horário já atingido."))
+                .when(horarioDisponivelService).verificarDisponibilidadeDeConsulta(horarioDisponivel);
 
         Exception exception = assertThrows(IllegalArgumentException.class, () ->{
-           consultaService.agendarConsulta(crmMedico, cpfPaciente, dataHora, tipoConsulta);
-        });
-
-        assertEquals("Horário não disponível", exception.getMessage());
-
-        verify(horarioDisponivelService, never()).salvarHorarioDaConsulta(any(HorarioDisponivel.class), any(Consulta.class));
-        verify(medicoService, never()).alterarMedico(any(UUID.class), any(Medico.class));
-        verify(pacienteService, never()).atualizarPaciente(any(UUID.class), any(Paciente.class));
-    }
-
-    //VERIFICAR NOVAMENTE METODOS REALACIONADDAS A CONSULTA E CAPCACIDADE (CONSULTA, HORARIOS DISPONIVEIS)
-    @Test
-    void testAgendarConsultaExcedendoCapacidade(){
-        String crmMedico = "123456";
-        String cpfPaciente = "12345678915";
-        LocalDateTime dataHora = LocalDateTime.now().plusDays(1);
-        LocalDateTime outroHorario = LocalDateTime.now();
-        System.out.println("DataHora: " + dataHora.toLocalDate());
-        System.out.println("Outro Horario: " + dataHora.toLocalDate());
-        String tipoConsulta = "Geral";
-
-        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", crmMedico, "15975328415", "Ortopedia");
-        Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", cpfPaciente, "+5588999999999");
-        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 1);
-
-        Consulta consulta = new Consulta(UUID.randomUUID(), dataHora, "Geral", paciente, medico);
-
-        horarioDisponivel.getConsultasAgendadas().add(consulta);
-
-        System.out.println("Verificando pode agendar: " + horarioDisponivel.podeAgendar());
-        horarioDisponivelService.salvarHorarioDaConsulta(horarioDisponivel, consulta);
-
-        when(medicoService.buscarMedicoPorCrm(crmMedico)).thenReturn(medico);
-        System.out.println("When Medico: " + medico.getId());
-        when(pacienteService.buscarPacientePorCpf(cpfPaciente)).thenReturn(paciente);
-        System.out.println("When Paciente: " + paciente.getId());
-        when(medicoService.buscarHorarioDisponivel(medico, dataHora)).thenReturn(horarioDisponivel);
-        System.out.println("When Horario disponivel: " + horarioDisponivel.getHorario().toLocalDate());
-
-        Exception exception = assertThrows(IllegalArgumentException.class, ()-> {
-            consultaService.agendarConsulta(crmMedico, cpfPaciente, dataHora, tipoConsulta);
+           consultaService.agendarConsulta(medico.getCrm(), paciente.getCpf(), horarioDisponivel.getHorario(), consulta.getTipoConsulta());
         });
 
         assertEquals("Limite de consultas para este horário já atingido.", exception.getMessage());
 
-        verify(horarioDisponivelService, never()).salvarHorarioDaConsulta(any(HorarioDisponivel.class), any(Consulta.class));
-        verify(medicoService, never()).alterarMedico(any(UUID.class), any(Medico.class));
-        verify(pacienteService, never()).atualizarPaciente(any(UUID.class), any(Paciente.class));
+        verify(consultaRepository, never()).save(any(Consulta.class));
+    }
+
+    @Test
+    public void testestAgendarConsultaHorarioNaoEncontrado(){
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. João", "12345", "11122233344", "Cardiologia");
+        Paciente paciente = new Paciente(UUID.randomUUID(), "Maria Silva", "maria@example.com", "11122233344", "11999999999");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now().plusDays(1), 5);
+        String tipoConsulta = "Geral";
+
+        when(medicoService.buscarMedicoPorCrm(medico.getCrm())).thenReturn(medico);
+        when(pacienteService.buscarPacientePorCpf(paciente.getCpf())).thenReturn(paciente);
+        //mock para não encontrar o horario
+        when(horarioDisponivelService.buscarHorarioPorMedico(medico.getCrm(), horarioDisponivel.getHorario())).thenThrow( new IllegalArgumentException("O médico não tem esse horário disponível"));
+
+        Exception exception = assertThrows( IllegalArgumentException.class, () ->{
+           consultaService.agendarConsulta(medico.getCrm(), paciente.getCpf(), horarioDisponivel.getHorario(), tipoConsulta);
+        });
+
+        assertEquals("O médico não tem esse horário disponível", exception.getMessage());
+
+        verify(consultaRepository, never()).save(any(Consulta.class));
+    }
+
+    //buscarConsultaPorId
+    @Test
+    public void testBuscarConsultaPorIdSucesso(){
+        UUID consultaId = UUID.randomUUID();
+        Consulta consulta = new Consulta();
+        consulta.setId(consultaId);
+
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.of(consulta));
+
+        Consulta result = consultaService.buscarConsultaPorId(consultaId);
+
+        assertNotNull(result);
+        assertEquals(consultaId, result.getId());
+
+        verify(consultaRepository, times(1)).findById(consultaId);
+    }
+
+    @Test
+    public void testBuscarConsultaPorIdNaoEncontrado(){
+        UUID consultaId = UUID.randomUUID();
+        Consulta consulta = new Consulta();
+        consulta.setId(consultaId);
+
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.empty());
+
+        Exception exception = assertThrows(IllegalArgumentException.class, ()->{
+           consultaService.buscarConsultaPorId(consultaId);
+        });
+
+        assertEquals("Consulta não encontrada", exception.getMessage());
+
+        verify(consultaRepository, times(1)).findById(consultaId);
     }
 
     //buscarConsultasPorMedico
     @Test
-    void testBuscarConsultaPorMedicoSucesso(){
+    public void testBuscarConsultaPorMedicoSucesso(){
         String crmMedico = "123456";
         Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", crmMedico, "15975385215", "Ortopedia");
 
@@ -220,29 +213,30 @@ class ConsultaServiceTest {
 
         assertNotNull(result);
         assertEquals(consultaList.size(), result.size());
-        assertEquals(consultaList, result);
+        assertTrue(result.containsAll(consultaList));
 
         verify(consultaRepository, times(1)).findByMedico(medico);
+        verify(medicoService, times(1)).buscarMedicoPorCrm(medico.getCrm());
     }
 
     @Test
-    void testBuscarConsultaPorMedicoNaoEncontrado(){
+    public void testBuscarConsultaPorMedicoNaoEncontrado(){
         String crmMedico = "123456";
 
         //mock para lançar exceção quando o medico não for encontrado
-        when(medicoService.buscarMedicoPorCrm(crmMedico)).thenThrow(new IllegalArgumentException("Médico não encontrado"));
+        when(medicoService.buscarMedicoPorCrm(crmMedico)).thenThrow(new IllegalArgumentException("Médico não encontrado com o CRM: " + crmMedico));
 
         Exception exception = assertThrows(IllegalArgumentException.class, ()->{
            consultaService.buscarConsultasPorMedico(crmMedico);
         });
 
-        assertEquals("Médico não encontrado", exception.getMessage());
+        assertEquals("Médico não encontrado com o CRM: " + crmMedico, exception.getMessage());
 
         verify(consultaRepository, never()).findByMedico(any(Medico.class));
     }
 
     @Test
-    void testBuscarConsultaPorMedicoSemConsulta(){
+    public void testBuscarConsultaPorMedicoSemConsulta(){
         String crmMedico = "123456";
         Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", crmMedico, "159753852450", "Geral");
 
@@ -257,13 +251,13 @@ class ConsultaServiceTest {
         assertNotNull(result);
         assertTrue(result.isEmpty());
 
+        verify(medicoService, times(1)).buscarMedicoPorCrm(crmMedico);
         verify(consultaRepository, times(1)).findByMedico(medico);
-
     }
 
     //buscarConsultasPorPaciente
     @Test
-    void testBuscarConsultaPorPacienteSucesso(){
+    public void testBuscarConsultaPorPacienteSucesso(){
         String cpfPaciente = "12345678915";
         Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", cpfPaciente, "+5588999999999");
 
@@ -278,29 +272,29 @@ class ConsultaServiceTest {
 
         assertNotNull(result);
         assertEquals(consultaList.size(), result.size());
-        assertEquals(consultaList, result);
+        assertTrue(result.containsAll(consultaList));
 
         verify(pacienteService, times(1)).buscarPacientePorCpf(cpfPaciente);
         verify(consultaRepository, times(1)).findByPaciente(paciente);
     }
 
     @Test
-    void testBuscarConsultaPorPacienteNaoEncontrado(){
+    public void testBuscarConsultaPorPacienteNaoEncontrado(){
         String cpfPaciente = "12345678915";
 
-        when(pacienteService.buscarPacientePorCpf(cpfPaciente)).thenThrow(new IllegalArgumentException("Paciente não encontrado"));
+        when(pacienteService.buscarPacientePorCpf(cpfPaciente)).thenThrow(new IllegalArgumentException("Paciente não encontrado com o CPF: "+ cpfPaciente));
 
         Exception exception = assertThrows(IllegalArgumentException.class, () -> {
             consultaService.buscarConsultasPorPaciente(cpfPaciente);
         });
 
-        assertEquals("Paciente não encontrado", exception.getMessage());
+        assertEquals("Paciente não encontrado com o CPF: "+cpfPaciente, exception.getMessage());
 
         verify(consultaRepository, never()).findByPaciente(any(Paciente.class));
     }
 
     @Test
-    void testBuscarConsultaPorPacienteSemConsulta(){
+    public void testBuscarConsultaPorPacienteSemConsulta(){
         String cpfPaciente = "12345678958";
         Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", cpfPaciente, "+5588999999999");
 
@@ -315,22 +309,24 @@ class ConsultaServiceTest {
         assertNotNull(result);
         assertTrue(result.isEmpty());
 
+        verify(pacienteService, times(1)).buscarPacientePorCpf(cpfPaciente);
         verify(consultaRepository, times(1)).findByPaciente(paciente);
-
     }
 
     //buscaConsultasPorData
     @Test
-    void testBuscarConsultaPorDataSucesso(){
+    public void testBuscarConsultaPorDataSucesso(){
         UUID medicoId = UUID.randomUUID();
         LocalDateTime dataHora = LocalDateTime.now();
-        LocalDate data = dataHora.toLocalDate();
         Medico medico = new Medico(medicoId, "Dr. Silva", "CRM1234", "12345678915", "Pediatra");
-        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 5);
-        List<Consulta> consultaList = new ArrayList<>();
-        consultaList.add(new Consulta(UUID.randomUUID(), dataHora, "Geral", null, medico, horarioDisponivel));
 
+        List<Consulta> consultaList = new ArrayList<>();
+        consultaList.add(new Consulta(UUID.randomUUID(), dataHora, "Geral", new Paciente(), medico));
+        consultaList.add(new Consulta(UUID.randomUUID(), dataHora, "Geral", new Paciente(), medico));
+
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 5);
         horarioDisponivel.getConsultasAgendadas().addAll(consultaList);
+
         medico.getHorarioDisponivel().add(horarioDisponivel);
 
         //mock para retornar o medico
@@ -340,13 +336,13 @@ class ConsultaServiceTest {
 
         assertNotNull(result);
         assertEquals(consultaList.size(), result.size());
-        assertEquals(consultaList, result);
+        assertTrue(result.containsAll(consultaList));
 
         verify(medicoService, times(1)).buscarMedicoPorId(medicoId);
     }
 
     @Test
-    void testBuscarConsultaPorDataComMedicoNaoEncnotrado(){
+    public void testBuscarConsultaPorDataComMedicoNaoEncnotrado(){
         UUID medicoId = UUID.randomUUID();
         LocalDateTime dataHora = LocalDateTime.now();
 
@@ -362,12 +358,12 @@ class ConsultaServiceTest {
     }
 
     @Test
-    void testBuscarConsultaPorDataSemConsultas(){
+    public void testBuscarConsultaPorDataSemConsultas(){
         UUID medicoId = UUID.randomUUID();
         LocalDateTime dataHora = LocalDateTime.now();
         Medico medico = new Medico(medicoId, "Dr. Silva", "CRM12345", "12346579885", "Ortopedista");
 
-        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(dataHora, 5);
+        medico.setHorarioDisponivel(new ArrayList<>());
 
         when(medicoService.buscarMedicoPorId(medicoId)).thenReturn(medico);
 
@@ -379,60 +375,266 @@ class ConsultaServiceTest {
         verify(medicoService, times(1)).buscarMedicoPorId(medicoId);
     }
 
-    //alterarConsulta
-    //rever metodos de consulta e entender melhor a relação entre HD e Consulta e Medico
-//    @Test
-//    void testAlterarConsultaSucesso(){
-//        UUID consultId = UUID.randomUUID();
-//        LocalDateTime novaDataHora = LocalDateTime.now().plusDays(1);
-//        String novoTipoConsulta = "Cardiologia";
-//
-//        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12346579815", "Cardiologista");
-//        Paciente paciente = new Paciente(UUID.randomUUID(), "José Humberto", "josehumberto@email.com", "12345678948", "+55889999999999");
-//        HorarioDisponivel horarioAntigo = new HorarioDisponivel(LocalDateTime.now(), 5);
-//        HorarioDisponivel novoHorario = new HorarioDisponivel(novaDataHora, 5);
-//
-//        Consulta consultaExistente = new Consulta(consultId, LocalDateTime.now(), "Ortopedia", paciente, medico, horarioAntigo);
-//
-//        when(consultaRepository.findById(consultId)).thenReturn(Optional.of(consultaExistente));
-//        when(medicoService.buscarHorarioDisponivel(medico, novaDataHora)).thenReturn(novoHorario);
-//
-//        Consulta result = consultaService.alterarConsulta(consultId, novaDataHora, novoTipoConsulta);
-//
-//        assertNotNull(result);
-//        assertEquals(novaDataHora, result.getDataHora());
-//        assertEquals(novoTipoConsulta, result.getTipoConsulta());
-//        assertEquals(novoHorario, result.getHorarioDisponivel());
-//
-//        verify(consultaRepository, times(1)).save(result);
-//        verify(medicoService, times(1)).alterarMedico(medico.getId(), medico);
-//        verify(pacienteService, times(1)).atualizarPaciente(paciente.getId(), paciente);
-//    }
-
+    //buscarConsultasPorEspecializacao
     @Test
-    void testAlterarConsultaNaoEncontrada(){
+    public void testBuscarConsultaPorEspecializacaoSuceso(){
+        String especializacao = "Ortopedia";
+        List<Medico> medicoList = new ArrayList<>();
+        medicoList.add(new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12354", "15975385215", especializacao));
+        medicoList.add(new Medico(UUID.randomUUID(), "Dr. Sousa", "CRM65432", "17425896315", especializacao));
+        List<Consulta> consultaList = new ArrayList<>();
+        consultaList.add(new Consulta(UUID.randomUUID(), LocalDateTime.now(), "Consulta Geral", new Paciente(), medicoList.get(0)));
+        consultaList.add(new Consulta(UUID.randomUUID(), LocalDateTime.now().plusDays(2), "Consulta Especializada", new Paciente(), medicoList.get(1)));
 
+        when(medicoService.buscarMedicosPorEspecializacao(especializacao)).thenReturn(medicoList);
+        when(consultaRepository.findByMedico(medicoList.get(0))).thenReturn(consultaList.subList(0,1));
+        when(consultaRepository.findByMedico(medicoList.get(1))).thenReturn(consultaList.subList(1,2));
+
+        List<Consulta> result = consultaService.buscarConsultasPorEspecializacao(especializacao);
+
+        assertNotNull(result);
+        assertEquals(consultaList.size(), result.size());
+        assertTrue(result.containsAll(consultaList));
+
+        verify(medicoService, times(1)).buscarMedicosPorEspecializacao(especializacao);
+        verify(consultaRepository, times(1)).findByMedico(medicoList.get(0));
+        verify(consultaRepository, times(1)).findByMedico(medicoList.get(1));
     }
 
     @Test
-    void testAlterarConsultaComHorarioNaoDisponivel(){
+    public void testBuscarConsultaPorEspecializacaoSemMedicosComEspecializacao(){
+        String especializacao = "Ortopedia";
 
+        when(medicoService.buscarMedicosPorEspecializacao(especializacao)).thenReturn(new ArrayList<>());
+
+        List<Consulta> result = consultaService.buscarConsultasPorEspecializacao(especializacao);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(medicoService, times(1)).buscarMedicosPorEspecializacao(especializacao);
+        verify(consultaRepository, never()).findByMedico(any(Medico.class));
     }
 
     @Test
-    void testAlterarConsultaExcedendoCapacidade(){
+    public void testBuscarConsultaPorEspecializacaoMedicosSemConsultas(){
+        String especializacao = "Ortopedia";
+        List<Medico> medicoList = new ArrayList<>();
+        medicoList.add(new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12354", "15975385215", especializacao));
+        medicoList.add(new Medico(UUID.randomUUID(), "Dr. Sousa", "CRM65432", "17425896315", especializacao));
 
+        when(medicoService.buscarMedicosPorEspecializacao(especializacao)).thenReturn(medicoList);
+        when(consultaRepository.findByMedico(medicoList.get(0))).thenReturn(new ArrayList<>());
+        when(consultaRepository.findByMedico(medicoList.get(1))).thenReturn(new ArrayList<>());
+
+        List<Consulta> result = consultaService.buscarConsultasPorEspecializacao(especializacao);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(medicoService, times(1)).buscarMedicosPorEspecializacao(especializacao);
+        verify(consultaRepository, times(1)).findByMedico(medicoList.get(0));
+        verify(consultaRepository, times(1)).findByMedico(medicoList.get(1));
+    }
+
+    //buscarConsultasPorIntervaloDeDatas
+    @Test
+    public void testBuscarConsultaPorIntervaloDeDatasSucesso(){
+        LocalDateTime dataInico = LocalDateTime.now().minusDays(1);
+        LocalDateTime dataFinal = LocalDateTime.now().plusDays(1);
+
+        List<Consulta> consultaList = new ArrayList<>();
+        consultaList.add(new Consulta(UUID.randomUUID(), LocalDateTime.now(), "Consulta Geral", new Paciente(), new Medico()));
+        consultaList.add(new Consulta(UUID.randomUUID(), LocalDateTime.now().plusHours(1), "Consulta Geral", new Paciente(), new Medico()));
+
+        when(consultaRepository.findByDataHoraBetween(dataInico, dataFinal)).thenReturn(consultaList);
+
+        List<Consulta> result = consultaService.buscarConsultasPorIntervaloDeDatas(dataInico, dataFinal);
+
+        assertNotNull(result);
+        assertEquals(consultaList.size(), result.size());
+        assertTrue(result.containsAll(consultaList));
+
+        verify(consultaRepository, times(1)).findByDataHoraBetween(dataInico, dataFinal);
+    }
+
+    @Test
+    public void testBuscarConsultaPorIntervaloDeDatasSemConsultas(){
+        LocalDateTime dataInico = LocalDateTime.now().minusDays(1);
+        LocalDateTime dataFinal = LocalDateTime.now().plusDays(1);
+
+        when(consultaRepository.findByDataHoraBetween(dataInico, dataFinal)).thenReturn(new ArrayList<>());
+
+        List<Consulta> result = consultaService.buscarConsultasPorIntervaloDeDatas(dataInico, dataFinal);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+
+        verify(consultaRepository, times(1)).findByDataHoraBetween(dataInico, dataFinal);
+    }
+
+    //alterarHorarioDaConsulta
+    @Test
+    public void alterarHorarioConsultaSucesso(){
+        UUID consultaId = UUID.randomUUID();
+        LocalDateTime novoHorario = LocalDateTime.now().plusDays(2);
+
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12345678951", "Cardiologia");
+        HorarioDisponivel horarioAntigo = new HorarioDisponivel(LocalDateTime.now(), 5);
+        HorarioDisponivel novoHorarioDisponivel = new HorarioDisponivel(novoHorario, 5);
+
+        Consulta consulta = new Consulta(consultaId, LocalDateTime.now(), "Consulta Geral", new Paciente(), medico);
+        consulta.setHorarioDisponivel(horarioAntigo);
+
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.of(consulta));
+        when(horarioDisponivelService.buscarHorarioPorMedico(medico.getCrm(), novoHorario)).thenReturn(novoHorarioDisponivel);
+
+        Consulta result = consultaService.alterarHorarioDaConsulta(consultaId, novoHorario);
+
+        //verifica se o horario antigo foi removido
+        assertFalse(horarioAntigo.getConsultasAgendadas().contains(consulta));
+        verify(horarioDisponivelService, times(1)).salvarMudancaDeHorario(horarioAntigo);
+
+        //verifica se a consulta foi adicionada ao novo horario
+        assertTrue(novoHorarioDisponivel.getConsultasAgendadas().contains(consulta));
+
+        //verifica se a consulta foi atualizada
+        assertEquals(novoHorario, result.getDataHora());
+        assertEquals(novoHorarioDisponivel, result.getHorarioDisponivel());
+
+        verify(consultaRepository, times(1)).save(consulta);
+        verify(horarioDisponivelService, times(1)).verificarDisponibilidadeDeConsulta(novoHorarioDisponivel);
+    }
+
+    @Test
+    public void testAlterarHorarioConsultaNaoEncontrada(){
+        UUID consultaId = UUID.randomUUID();
+        LocalDateTime novoHorario = LocalDateTime.now().plusDays(2);
+
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12345678951", "Cardiologia");
+        HorarioDisponivel horarioAntigo = new HorarioDisponivel(LocalDateTime.now(), 5);
+
+        Consulta consulta = new Consulta(consultaId, LocalDateTime.now(), "Consulta Geral", new Paciente(), medico);
+        consulta.setHorarioDisponivel(horarioAntigo);
+
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.empty());
+
+        Exception exception = assertThrows(IllegalArgumentException.class, ()->{
+           consultaService.alterarHorarioDaConsulta(consultaId, novoHorario);
+        });
+
+        assertEquals("Consulta não encontrada", exception.getMessage());
+
+        verify(horarioDisponivelService, never()).buscarHorarioPorMedico(anyString(), any(LocalDateTime.class));
+        verify(consultaRepository, never()).save(any(Consulta.class));
+    }
+
+    @Test
+    public void testAlterarHorarioConsultaComHorarioNaoDisponivel(){
+        UUID consultaId = UUID.randomUUID();
+        LocalDateTime novoHorario = LocalDateTime.now().plusDays(2);
+
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12345678951", "Cardiologia");
+        HorarioDisponivel horarioAntigo = new HorarioDisponivel(LocalDateTime.now(), 5);
+        HorarioDisponivel novoHorarioDisponivel = new HorarioDisponivel(novoHorario, 5);
+
+        Consulta consulta = new Consulta(consultaId, LocalDateTime.now(), "Consulta Geral", new Paciente(), medico);
+        consulta.setHorarioDisponivel(horarioAntigo);
+
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.of(consulta));
+        when(horarioDisponivelService.buscarHorarioPorMedico(medico.getCrm(), novoHorario)).thenReturn(novoHorarioDisponivel);
+        doThrow(new IllegalArgumentException("Limite de consultas para esté horário já atingido"))
+                .when(horarioDisponivelService).verificarDisponibilidadeDeConsulta(novoHorarioDisponivel);
+
+        Exception exception = assertThrows(IllegalArgumentException.class, ()->{
+            consultaService.alterarHorarioDaConsulta(consultaId, novoHorario);
+        });
+
+        assertEquals("Limite de consultas para esté horário já atingido", exception.getMessage());
+
+        verify(horarioDisponivelService,times(1)).verificarDisponibilidadeDeConsulta(novoHorarioDisponivel);
+        verify(consultaRepository, never()).save(any(Consulta.class));
     }
 
     //removerConsulta
     @Test
-    void testRemoverConsultaSucesso(){
+    public void testRemoverConsultaSucesso(){
+        UUID consultaId = UUID.randomUUID();
 
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM12345", "12345678951", "Cardiologia");
+        Paciente paciente = new Paciente(UUID.randomUUID(), "José", "jose@email.com", "12345678915", "+5588999999999");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(LocalDateTime.now(), 5);
+
+        horarioDisponivel.setConsultasAgendadas(new ArrayList<>());
+        medico.setHorarioDisponivel(List.of(horarioDisponivel));
+        paciente.setConsultas(new ArrayList<>());
+
+        Consulta consulta = new Consulta(consultaId, LocalDateTime.now(), "Consulta Geral", paciente, medico);
+        consulta.setHorarioDisponivel(horarioDisponivel);
+
+        horarioDisponivel.getConsultasAgendadas().add(consulta);
+        paciente.getConsultas().add(consulta);
+
+
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.of(consulta));
+        consultaService.removerConsulta(consultaId);
+
+        assertFalse(horarioDisponivel.getConsultasAgendadas().contains(consulta));
+        assertFalse(paciente.getConsultas().contains(consulta));
+
+        verify(medicoService, times(1)).alterarMedico(medico.getId(), medico);
+        verify(pacienteService, times(1)).atualizarPaciente(paciente.getId(), paciente);
+        verify(consultaRepository, times(1)).delete(consulta);
     }
 
     @Test
-    void testRemoverConsultaNaoEncontrada(){
+    public void testRemoverConsultaNaoEncontrada(){
+        UUID consultaId = UUID.randomUUID();
 
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.empty());
+
+        Exception exception = assertThrows(IllegalArgumentException.class, ()->{
+           consultaService.removerConsulta(consultaId);
+        });
+
+        assertEquals("Consulta não encontrada", exception.getMessage());
+
+        verify(medicoService, never()).alterarMedico(any(UUID.class), any(Medico.class));
+        verify(pacienteService, never()).atualizarPaciente(any(UUID.class), any(Paciente.class));
+        verify(consultaRepository, never()).delete(any(Consulta.class));
+    }
+
+    @Test
+    public void testRemoverConsultaNaoAssociadaAoHorario(){
+        UUID consultaId = UUID.randomUUID();
+        LocalDateTime horarioConsulta = LocalDateTime.now();
+
+        Medico medico = new Medico(UUID.randomUUID(), "Dr. Silva", "CRM13245", "1597515948", "Cardiologia");
+        Paciente paciente = new Paciente(UUID.randomUUID(), "José", "jose@email.com", "12345678901", "999999999");
+        HorarioDisponivel horarioDisponivel = new HorarioDisponivel(horarioConsulta, 5);
+
+        horarioDisponivel.setConsultasAgendadas(new ArrayList<>());
+        medico.setHorarioDisponivel(List.of(horarioDisponivel));
+        paciente.setConsultas(new ArrayList<>());
+
+        Consulta consulta = new Consulta(consultaId, horarioConsulta, "Consulta Geral", paciente, medico);
+        consulta.setHorarioDisponivel(horarioDisponivel);
+
+        paciente.getConsultas().add(consulta);
+
+        when(consultaRepository.findById(consultaId)).thenReturn(Optional.of(consulta));
+
+        consultaService.removerConsulta(consultaId);
+
+        //verifica se a consulta foi removida
+        assertFalse(paciente.getConsultas().contains(consulta));
+        //verifica se a consulta não está presente
+        assertFalse(horarioDisponivel.getConsultasAgendadas().contains(consulta));
+
+        verify(medicoService,times(1)).alterarMedico(medico.getId(), medico);
+        verify(pacienteService, times(1)).atualizarPaciente(paciente.getId(), paciente);
+
+        verify(consultaRepository, times(1)).delete(consulta);
     }
 
 }
